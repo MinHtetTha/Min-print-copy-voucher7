@@ -365,37 +365,44 @@
         const h = history[idx];
         renderVoucherToOverlay(h);
         
-        // Wait for overlay to render
+        // Show overlay temporarily for rendering
+        const overlay = document.getElementById('vOverlay');
+        const originalDisplay = overlay.style.display;
+        overlay.style.display = 'flex';
+
         setTimeout(async () => {
             try {
                 const captureArea = document.getElementById('vCapture');
-                const canvas = await html2canvas(captureArea, { scale: 2, useCORS: true });
+                const canvas = await html2canvas(captureArea, { 
+                    scale: 2, 
+                    useCORS: true,
+                    logging: false 
+                });
                 
-                // Create PDF object
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, 200] });
                 doc.addImage(canvas.toDataURL('image/png'), 'PNG', 2, 2, 76, 0);
                 
-                // Convert PDF to Blob
-                const pdfBlob = doc.output('blob');
-                
-                // Create File for Share API
-                const pdfFile = new File([pdfBlob], `Min_Voucher_${h.vNo}.pdf`, { type: "application/pdf" });
+                const pdfArrayBuffer = doc.output('arraybuffer');
+                const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
+                const pdfFile = new File([pdfBlob], `Voucher_${h.vNo}.pdf`, { type: 'application/pdf' });
 
                 if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
                     await navigator.share({
                         files: [pdfFile],
-                        title: `Voucher #${h.vNo}`,
-                        text: `Min Copy & Print - Voucher No: ${h.vNo}`
+                        title: `Min Voucher #${h.vNo}`,
+                        text: `Share Voucher: ${h.customer}`
                     });
                 } else {
-                    // Fallback for browsers that don't support file sharing
-                    doc.save(`Min_Voucher_${h.vNo}.pdf`);
-                    alert("Sharing files is not supported on this browser. PDF has been downloaded.");
+                    doc.save(`Voucher_${h.vNo}.pdf`);
+                    alert("Sharing not supported. File downloaded instead.");
                 }
             } catch (err) {
-                console.error("Error sharing PDF:", err);
-                alert("Share process failed. Try again.");
+                console.error("Share error:", err);
+                alert("Share process failed. Please try again.");
+            } finally {
+                // Return overlay to original state if we only opened it to share
+                if (originalDisplay !== 'flex') overlay.style.display = originalDisplay;
             }
         }, 500);
     }
@@ -516,6 +523,5 @@
 </body>
 </html>
 
-        
-        
-        
+
+    
