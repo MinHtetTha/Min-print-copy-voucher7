@@ -52,7 +52,6 @@
         .hidden { display: none; }
         .report-card { background: white; padding: 15px; border-radius: 15px; margin-bottom: 10px; border-left: 5px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-        /* Voucher PDF List Style */
         .pdf-item { display: flex; align-items: center; justify-content: space-between; background: white; padding: 15px; border-radius: 15px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .pdf-info { flex: 1; }
         .pdf-actions { display: flex; gap: 8px; }
@@ -203,7 +202,6 @@
         document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
         document.getElementById(tab + 'View').classList.remove('hidden');
         
-        // Highlight active nav item
         const navItems = document.querySelectorAll('.nav-item');
         if(tab === 'pos') navItems[0].classList.add('active');
         if(tab === 'history') navItems[1].classList.add('active');
@@ -310,7 +308,6 @@
             document.getElementById('vQRImg').src = (pay === 'KPay') ? 'kpay-qr.jpg' : 'wave-qr.jpg';
         } else { document.getElementById('vQRBox').style.display = 'none'; }
 
-        // Save to History
         history.push({ 
             vNo, date: dateStr, time: timeStr,
             total: res.total, items: [...cart], 
@@ -323,7 +320,6 @@
 
         document.getElementById('vOverlay').style.display = 'flex';
         
-        // Auto PDF Generation
         setTimeout(async () => {
             const captureArea = document.getElementById('vCapture');
             const canvas = await html2canvas(captureArea, { scale: 2, useCORS: true });
@@ -351,7 +347,7 @@
                     </div>
                     <div class="pdf-actions">
                         <button class="pdf-btn btn-view" onclick="reViewVoucher(${realIdx})"><i class="fas fa-eye"></i></button>
-                        <button class="pdf-btn btn-share" onclick="shareVoucher(${realIdx})"><i class="fas fa-share-alt"></i></button>
+                        <button class="pdf-btn btn-share" onclick="shareExistingVoucher(${realIdx})"><i class="fas fa-share-alt"></i></button>
                         <button class="pdf-btn btn-del" onclick="deleteHistory(${realIdx})"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>`;
@@ -360,32 +356,60 @@
 
     function reViewVoucher(idx) {
         const h = history[idx];
-        cart = h.items;
-        document.getElementById('custName').value = h.customer === 'General' ? '' : h.customer;
-        document.getElementById('custPhone').value = h.phone || '';
-        document.getElementById('pMethod').value = h.method;
-        
-        // Temporarily adjust vCount for view
-        let oldV = vCount;
-        vCount = parseInt(h.vNo);
-        
-        // This is a view-only call, don't want to re-save to history
-        const originalHistoryPush = history.push;
-        history.push = () => {}; 
-        
-        generateVoucher();
-        
-        // Restore
-        history.push = originalHistoryPush;
-        vCount = oldV;
+        renderVoucherToOverlay(h);
+        document.getElementById('vOverlay').style.display = 'flex';
     }
 
-    async function shareVoucher(idx) {
-        // Logic to generate and trigger native share if supported
-        reViewVoucher(idx);
-        setTimeout(() => {
-            alert("PDF generated! You can now share it from your downloads.");
-        }, 1500);
+    async function shareExistingVoucher(idx) {
+        const h = history[idx];
+        renderVoucherToOverlay(h);
+        
+        setTimeout(async () => {
+            const captureArea = document.getElementById('vCapture');
+            const canvas = await html2canvas(captureArea, { scale: 2, useCORS: true });
+            canvas.toBlob(async (blob) => {
+                const file = new File([blob], `Voucher_${h.vNo}.png`, { type: "image/png" });
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            files: [file],
+                            title: `Voucher #${h.vNo}`,
+                            text: 'Min Copy & Print Voucher'
+                        });
+                    } catch (err) {
+                        console.log("Sharing failed", err);
+                    }
+                } else {
+                    alert("Your browser does not support sharing.");
+                }
+            });
+        }, 500);
+    }
+
+    function renderVoucherToOverlay(h) {
+        document.getElementById('vnNo').innerText = "Voucher: #" + h.vNo;
+        document.getElementById('vdDate').innerText = "Date: " + h.date;
+        document.getElementById('vsSub').innerText = h.items.reduce((acc, i) => acc + i.t, 0).toLocaleString();
+        document.getElementById('vedExtra').innerText = "0"; // Note: Store extra/disc separately in history if needed
+        document.getElementById('vgGrand').innerText = h.total.toLocaleString();
+        document.getElementById('vpPay').innerText = h.method;
+
+        if(h.customer !== 'General' || h.phone) {
+            document.getElementById('vCustInfo').style.display = 'block';
+            document.getElementById('vnName').innerText = h.customer;
+            document.getElementById('vnPhone').innerText = h.phone || '-';
+        } else {
+            document.getElementById('vCustInfo').style.display = 'none';
+        }
+
+        const vt = document.getElementById('vtBody');
+        vt.innerHTML = '';
+        h.items.forEach(i => vt.innerHTML += `<tr><td>${i.n}</td><td align="center">${i.q}</td><td align="right">${i.t.toLocaleString()}</td></tr>`);
+
+        if(h.method !== 'Cash') {
+            document.getElementById('vQRBox').style.display = 'block';
+            document.getElementById('vQRImg').src = (h.method === 'KPay') ? 'kpay-qr.jpg' : 'wave-qr.jpg';
+        } else { document.getElementById('vQRBox').style.display = 'none'; }
     }
 
     function deleteHistory(idx) {
@@ -476,3 +500,6 @@
 </script>
 </body>
 </html>
+
+
+                    
