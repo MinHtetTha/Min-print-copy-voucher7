@@ -1,4 +1,4 @@
-      <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="my">
 <head>
     <meta charset="UTF-8">
@@ -365,33 +365,39 @@
         const h = history[idx];
         renderVoucherToOverlay(h);
         
+        // Wait for overlay to render
         setTimeout(async () => {
-            const captureArea = document.getElementById('vCapture');
-            const canvas = await html2canvas(captureArea, { scale: 2, useCORS: true });
-            
-            // Create PDF
-            const doc = new jspdf.jsPDF({ orientation: 'p', unit: 'mm', format: [80, 200] });
-            doc.addImage(canvas.toDataURL('image/png'), 'PNG', 2, 2, 76, 0);
-            
-            // Convert PDF to Blob for sharing
-            const pdfBlob = doc.output('blob');
-            const file = new File([pdfBlob], `Voucher_${h.vNo}.pdf`, { type: "application/pdf" });
+            try {
+                const captureArea = document.getElementById('vCapture');
+                const canvas = await html2canvas(captureArea, { scale: 2, useCORS: true });
+                
+                // Create PDF object
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, 200] });
+                doc.addImage(canvas.toDataURL('image/png'), 'PNG', 2, 2, 76, 0);
+                
+                // Convert PDF to Blob
+                const pdfBlob = doc.output('blob');
+                
+                // Create File for Share API
+                const pdfFile = new File([pdfBlob], `Min_Voucher_${h.vNo}.pdf`, { type: "application/pdf" });
 
-            if (navigator.share) {
-                try {
+                if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
                     await navigator.share({
-                        files: [file],
+                        files: [pdfFile],
                         title: `Voucher #${h.vNo}`,
-                        text: 'Min Copy & Print PDF Voucher'
+                        text: `Min Copy & Print - Voucher No: ${h.vNo}`
                     });
-                } catch (err) {
-                    console.log("PDF Sharing failed", err);
+                } else {
+                    // Fallback for browsers that don't support file sharing
+                    doc.save(`Min_Voucher_${h.vNo}.pdf`);
+                    alert("Sharing files is not supported on this browser. PDF has been downloaded.");
                 }
-            } else {
-                alert("Sharing not supported. PDF downloaded instead.");
-                doc.save(`Voucher_${h.vNo}.pdf`);
+            } catch (err) {
+                console.error("Error sharing PDF:", err);
+                alert("Share process failed. Try again.");
             }
-        }, 600);
+        }, 500);
     }
 
     function renderVoucherToOverlay(h) {
@@ -509,7 +515,7 @@
 </script>
 </body>
 </html>
-      
 
-
-                    
+        
+        
+        
