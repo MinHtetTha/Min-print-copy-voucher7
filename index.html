@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+      <!DOCTYPE html>
 <html lang="my">
 <head>
     <meta charset="UTF-8">
@@ -311,7 +311,8 @@
         history.push({ 
             vNo, date: dateStr, time: timeStr,
             total: res.total, items: [...cart], 
-            method: pay, customer: cName || 'General', phone: cPhone 
+            method: pay, customer: cName || 'General', phone: cPhone,
+            extra: res.e, disc: res.d
         });
         localStorage.setItem('min_history', JSON.stringify(history));
         
@@ -347,7 +348,7 @@
                     </div>
                     <div class="pdf-actions">
                         <button class="pdf-btn btn-view" onclick="reViewVoucher(${realIdx})"><i class="fas fa-eye"></i></button>
-                        <button class="pdf-btn btn-share" onclick="shareExistingVoucher(${realIdx})"><i class="fas fa-share-alt"></i></button>
+                        <button class="pdf-btn btn-share" onclick="shareAsPDF(${realIdx})"><i class="fas fa-share-alt"></i></button>
                         <button class="pdf-btn btn-del" onclick="deleteHistory(${realIdx})"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>`;
@@ -360,37 +361,45 @@
         document.getElementById('vOverlay').style.display = 'flex';
     }
 
-    async function shareExistingVoucher(idx) {
+    async function shareAsPDF(idx) {
         const h = history[idx];
         renderVoucherToOverlay(h);
         
         setTimeout(async () => {
             const captureArea = document.getElementById('vCapture');
             const canvas = await html2canvas(captureArea, { scale: 2, useCORS: true });
-            canvas.toBlob(async (blob) => {
-                const file = new File([blob], `Voucher_${h.vNo}.png`, { type: "image/png" });
-                if (navigator.share) {
-                    try {
-                        await navigator.share({
-                            files: [file],
-                            title: `Voucher #${h.vNo}`,
-                            text: 'Min Copy & Print Voucher'
-                        });
-                    } catch (err) {
-                        console.log("Sharing failed", err);
-                    }
-                } else {
-                    alert("Your browser does not support sharing.");
+            
+            // Create PDF
+            const doc = new jspdf.jsPDF({ orientation: 'p', unit: 'mm', format: [80, 200] });
+            doc.addImage(canvas.toDataURL('image/png'), 'PNG', 2, 2, 76, 0);
+            
+            // Convert PDF to Blob for sharing
+            const pdfBlob = doc.output('blob');
+            const file = new File([pdfBlob], `Voucher_${h.vNo}.pdf`, { type: "application/pdf" });
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: `Voucher #${h.vNo}`,
+                        text: 'Min Copy & Print PDF Voucher'
+                    });
+                } catch (err) {
+                    console.log("PDF Sharing failed", err);
                 }
-            });
-        }, 500);
+            } else {
+                alert("Sharing not supported. PDF downloaded instead.");
+                doc.save(`Voucher_${h.vNo}.pdf`);
+            }
+        }, 600);
     }
 
     function renderVoucherToOverlay(h) {
         document.getElementById('vnNo').innerText = "Voucher: #" + h.vNo;
         document.getElementById('vdDate').innerText = "Date: " + h.date;
-        document.getElementById('vsSub').innerText = h.items.reduce((acc, i) => acc + i.t, 0).toLocaleString();
-        document.getElementById('vedExtra').innerText = "0"; // Note: Store extra/disc separately in history if needed
+        const sub = h.items.reduce((acc, i) => acc + i.t, 0);
+        document.getElementById('vsSub').innerText = sub.toLocaleString();
+        document.getElementById('vedExtra').innerText = ((h.extra || 0) - (h.disc || 0)).toLocaleString();
         document.getElementById('vgGrand').innerText = h.total.toLocaleString();
         document.getElementById('vpPay').innerText = h.method;
 
@@ -500,6 +509,7 @@
 </script>
 </body>
 </html>
+      
 
 
                     
